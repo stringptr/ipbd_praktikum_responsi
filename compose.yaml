@@ -1,0 +1,29 @@
+services:
+  api:
+    build: ./api
+    working_dir: /app
+    ports:
+      - "8000:80"
+    volumes:
+      - ./api:/app:z
+      - uv_cache:/root/.cache/uv:z
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    command:
+      [
+        "uv",
+        "run",
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "80",
+        "--reload",
+      ]
+
+volumes:
+  uv_cache:
