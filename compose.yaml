@@ -3,10 +3,11 @@ services:
     build: ./api
     working_dir: /app
     ports:
-      - "8000:80"
+      - "${HOST_IP-127.0.0.1}:8000:80"
     volumes:
       - ./api:/app:z
       - uv_cache:/root/.cache/uv:z
+    env_file: .env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       timeout: 5s
