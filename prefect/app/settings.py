@@ -30,7 +30,7 @@ class Settings:
     # ============================================================
     # API Settings
     # ============================================================
-    API_BASE_URL: str = os.getenv("API_BASE_URL", "api:80")
+    API_BASE_URL: str = os.getenv("API_BASE_URL", "http://api")
     API_TIMEOUT: int = int(os.getenv("API_TIMEOUT", "30"))
     API_MAX_RETRIES: int = int(os.getenv("API_MAX_RETRIES", "3"))
     API_RETRY_DELAYS: list[int] = [2, 5, 10]

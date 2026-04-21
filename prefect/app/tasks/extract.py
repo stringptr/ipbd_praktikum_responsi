@@ -32,7 +32,7 @@ def fetch_posts(api_url: str | None = None, limit: int = 10) -> list[dict[str, A
         List of post dictionaries
     """
     base_url = api_url or settings.API_BASE_URL
-    url = f"{base_url}/articles"
+    url = f"{base_url}/api/v1/articles"
     params = {"_limit": limit}
 
     print(f"Fetching data from {url}...")
