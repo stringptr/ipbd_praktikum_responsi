@@ -1,3 +1,5 @@
 .env
 docs
 __pycache__
+prefect/app/checkpoints
+prefect/dragonfly
