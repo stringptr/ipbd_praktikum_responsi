@@ -2,14 +2,17 @@ services:
   api:
     build: ./api
     working_dir: /app
+    expose:
+      - 80
     ports:
       - "${HOST_IP-127.0.0.1}:8000:80"
     volumes:
       - ./api:/app:z
+      - /app/.venv
       - uv_cache:/root/.cache/uv:z
     env_file: .env
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/api/health"]
       timeout: 5s
       retries: 5
       start_period: 10s
@@ -33,7 +36,7 @@ services:
       POSTGRES_PASSWORD: prefect
       POSTGRES_DB: prefect
     volumes:
-      - ./prefect/postgres_data:/var/lib/postgresql/data
+      - ./prefect/postgres:/var/lib/postgresql/data:z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U prefect"]
       interval: 5s
@@ -46,7 +49,7 @@ services:
       - 6379
     restart: always
     volumes:
-      - ./prefect/dragonfly_data:/data
+      - ./prefect/dragonfly:/data:z
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping"]
       interval: 5s
@@ -61,9 +64,9 @@ services:
       ]
 
   prefect-server:
-    image: docker.io/prefecthq/prefect:3-latest
+    image: docker.io/prefecthq/prefect:sha-093cd05-python3.11-conda
     depends_on:
-      postgres:
+      postgres-prefect:
         condition: service_healthy
       dragonfly:
         condition: service_healthy
@@ -78,6 +81,7 @@ services:
       PREFECT_REDIS_MESSAGING_DB: 0
     env_file: .env
     command: prefect server start --no-services
+    restart: always
     ports:
       - "${HOST_IP-127.0.0.1}:4200:4200"
     healthcheck:
@@ -86,7 +90,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request as u; u.urlopen('http://${HOST_IP-127.0.0.1}:4200/api/health', timeout=1)",
+          "import urllib.request as u; u.urlopen('http://127.0.0.1:4200/api/health', timeout=1)",
         ]
       interval: 30s
       timeout: 10s
@@ -94,7 +98,7 @@ services:
       start_period: 60s
 
   prefect-services:
-    image: docker.io/prefecthq/prefect:3-latest
+    image: docker.io/prefecthq/prefect:sha-093cd05-python3.11-conda
     depends_on:
       prefect-server:
         condition: service_healthy
@@ -108,12 +112,15 @@ services:
     command: prefect server services start
 
   prefect-worker:
-    image: docker.io/prefecthq/prefect:3-latest
+    image: docker.io/prefecthq/prefect:sha-093cd05-python3.11-conda
     depends_on:
       prefect-server:
         condition: service_healthy
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
+    env_file: .env
+    volumes:
+      - ./prefect/app:/prefect:z
     command: prefect worker start --pool local-pool
     restart: on-failure
 
@@ -121,16 +128,16 @@ services:
     image: docker.io/postgres:18.3-alpine3.23
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_LAKEHOUSE_USER-postgres}
-      POSTGRES_DB: ${POSTGRES_WAREHOUSE_DB-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_WAREHOUSE_PASSWORD-postgres}
+      POSTGRES_USER: ${WAREHOUSE_USER-postgres}
+      POSTGRES_DB: ${WAREHOUSE_DB-postgres}
+      POSTGRES_PASSWORD: ${WAREHOUSE_PASSWORD-postgres}
     env_file: .env
     ports:
       - "${HOST_IP-127.0.0.1}:5432:5432"
     volumes:
-      - ./warehouse:/var/lib/postgresql/data
+      - ./warehouse:/var/lib/postgresql/data:z
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_USER} -d ${WAREHOUSE_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
