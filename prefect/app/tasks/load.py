@@ -17,7 +17,10 @@ from config.database import db_manager
     retry_delay_seconds=[5, 10],
 )
 def insert_to_database(
-    df: pd.DataFrame, table_name: str | None = None, if_exists: str = "append"
+    df: pd.DataFrame,
+    schema_name: str | None = None,
+    table_name: str | None = None,
+    if_exists: str = "append",
 ) -> int:
     """
     Insert DataFrame into PostgreSQL database using environment variables.
@@ -38,6 +41,7 @@ def insert_to_database(
     with db_manager.get_connection() as connection:
         _ = df.to_sql(
             name=table_name,
+            schema=schema_name,
             con=connection,
             if_exists=if_exists,
             index=False,
@@ -45,7 +49,7 @@ def insert_to_database(
             chunksize=1000,
         )
 
-        total_count = db_manager.get_table_count(table_name)
+        total_count = db_manager.get_table_count(schema_name, table_name)
 
         print(f"Inserted {len(df)} rows into '{table_name}'")
         print(f"Total rows in table: {total_count}")
@@ -59,7 +63,10 @@ def insert_to_database(
     tags=["load", "database", "batch"],
 )
 def insert_to_database_batch(
-    df: pd.DataFrame, table_name: str | None = None, batch_size: int = 500
+    df: pd.DataFrame,
+    schema_name: str | None = None,
+    table_name: str | None = None,
+    batch_size: int = 500,
 ) -> int:
     """
     Insert DataFrame in batches for better memory management.
@@ -80,6 +87,7 @@ def insert_to_database_batch(
             batch = df.iloc[i : i + batch_size]
             batch.to_sql(
                 name=table_name,
+                schema=schema_name,
                 con=connection,
                 if_exists="append" if i > 0 else "append",
                 index=False,
@@ -98,7 +106,7 @@ def insert_to_database_batch(
     tags=["load", "database", "hybrid"],
 )
 async def insert_to_database_hybrid(
-    df: pd.DataFrame, table_name: str | None = None
+    df: pd.DataFrame, table_name: str | None = None, schema_name: str | None = None
 ) -> int:
     """
     Hybrid approach: Try Prefect Block first, fallback to .env.
@@ -113,6 +121,7 @@ async def insert_to_database_hybrid(
         with database_block.get_connection(begin=True) as connection:
             _ = df.to_sql(
                 name=table_name,
+                schema=schema_name,
                 con=connection.engine,
                 if_exists="append",
                 index=False,
@@ -134,7 +143,7 @@ async def insert_to_database_hybrid(
             )
         print("Used .env configuration (local mode)")
 
-    total_count = db_manager.get_table_count(table_name)
+    total_count = db_manager.get_table_count(schema_name, table_name)
     print(f"Total rows in table: {total_count}")
 
     return len(df)

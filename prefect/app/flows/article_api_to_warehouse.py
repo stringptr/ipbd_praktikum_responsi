@@ -42,7 +42,8 @@ class WiredArticleSchema(TypedDict):
 def api_to_db_flow(
     api_url: str | None = None,
     limit: int | None = None,
-    table_name: str | None = None,
+    schema_name: str = "silver",
+    table_name: str = "wired_articles",
     use_hybrid: bool = False,
     save_intermediate: bool = False,
 ) -> dict[str, Any]:
@@ -116,9 +117,11 @@ def api_to_db_flow(
     print("\nPhase 3: Loading")
 
     if use_hybrid:
-        rows_inserted = insert_to_database_hybrid(transformed_df, table_name)
+        rows_inserted = insert_to_database_hybrid(
+            transformed_df, schema_name, table_name
+        )
     else:
-        rows_inserted = insert_to_database(transformed_df, table_name)
+        rows_inserted = insert_to_database(transformed_df, schema_name, table_name)
 
     # ============================================================
     # Metrics and Cleanup
@@ -145,7 +148,8 @@ def api_to_db_flow(
 @flow(name="API to Database ETL - Simple", log_prints=True)
 def api_to_db_flow_simple(
     limit: int = 10,
-    table_name: str = "posts",
+    schema_name: str = "silver",
+    table_name: str = "wired_articles",
 ) -> int:
     """
     Simplified version of the ETL flow with minimal configuration.
@@ -161,7 +165,7 @@ def api_to_db_flow_simple(
 
     transformed_df = transform_posts(raw_data)
 
-    rows_inserted = insert_to_database(transformed_df, table_name)
+    rows_inserted = insert_to_database(transformed_df, schema_name, table_name)
 
     return rows_inserted
 
