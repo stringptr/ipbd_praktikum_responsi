@@ -21,7 +21,7 @@ class Settings:
     WAREHOUSE_PORT: str = os.getenv("WAREHOUSE_PORT", "5432")
     WAREHOUSE_USER: str = os.getenv("WAREHOUSE_USER", "")
     WAREHOUSE_PASSWORD: str = os.getenv("WAREHOUSE_PASSWORD", "")
-    WAREHOUSE_NAME: str = os.getenv("WAREHOUSE_NAME", "postgres")
+    WAREHOUSE_NAME: str = os.getenv("WAREHOUSE_DB", "postgres")
 
     DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "5"))
     DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "10"))
