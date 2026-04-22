@@ -2,13 +2,34 @@
 
 import os
 
+from typing import TypedDict, NotRequired, Any
 from prefect import flow
+import pandas as pd
 
 from settings import settings
 from tasks.extract import fetch_posts
 from tasks.transform import transform_posts, validate_transformed_data
 from tasks.load import insert_to_database, insert_to_database_hybrid
 from utils.helpers import log_metrics, save_checkpoint
+
+
+class WiredArticleSchema(TypedDict):
+    title: str
+    url: str
+    author: str
+    description: NotRequired[str]
+    scraped_at: NotRequired[str]
+    source: NotRequired[str]
+
+    @classmethod
+    def defaults(cls) -> dict[str, Any]:
+        return {
+            "title": "",
+            "url": "",
+            "author": "",
+            "description": "",
+            "source": "Wired.com",
+        }
 
 
 @flow(
@@ -22,9 +43,9 @@ def api_to_db_flow(
     api_url: str | None = None,
     limit: int | None = None,
     table_name: str | None = None,
-    use_hybrid: bool = True,
+    use_hybrid: bool = False,
     save_intermediate: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """
     Main ETL flow for API to database pipeline.
 
@@ -52,8 +73,18 @@ def api_to_db_flow(
     print("\nPhase 1: Extraction")
     raw_data = fetch_posts(api_url, limit=limit)
 
+    session_id = raw_data.get("session_id")
+    timestamp = raw_data.get("timestamp")
+    articles_count = raw_data.get("articles_count")
+
+    # Unwrap articles
+    if isinstance(raw_data, dict) and "articles" in raw_data:
+        articles_list = raw_data["articles"]
+    elif isinstance(raw_data, list):
+        articles_list = raw_data
+
     if save_intermediate:
-        save_checkpoint(raw_data, "extracted_data")
+        save_checkpoint(articles_list, "extracted_data")
 
     # ============================================================
     # Transform Phase
@@ -62,10 +93,21 @@ def api_to_db_flow(
     print("\nPhase 2: Transformation")
     transformed_df = transform_posts(articles_list, WiredArticleSchema)
 
-    validate_transformed_data(transformed_df)
+    print("\nPhase 2: Transformation")
+    transformed_df = transform_posts(articles_list, WiredArticleSchema)
+
+    _ = validate_transformed_data(
+        transformed_df,
+        ["url", "title", "author", "description", "scraped_at", "source"],
+        ["url", "title"],
+    )
 
     if save_intermediate:
         save_checkpoint(transformed_df.to_dict(), "transformed_data")
+
+    transformed_df["session_id"] = session_id
+    transformed_df["timestamp"] = timestamp
+    transformed_df["articles_count"] = articles_count
 
     # ============================================================
     # Load Phase
@@ -81,6 +123,7 @@ def api_to_db_flow(
     # ============================================================
     # Metrics and Cleanup
     # ============================================================
+
     metrics = {
         "records_fetched": len(raw_data),
         "records_transformed": len(transformed_df),
@@ -126,7 +169,7 @@ def api_to_db_flow_simple(
 # ============================================================
 # Script Entry Point
 # ============================================================
+
 if __name__ == "__main__":
-    # Run locally with .env file
     result = api_to_db_flow(limit=10, save_intermediate=True)
     print(f"\nFlow result: {result}")

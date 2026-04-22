@@ -1,5 +1,6 @@
 """Extract tasks for fetching data from APIs."""
 
+from datetime import timedelta
 from typing import Any
 
 import httpx
@@ -17,7 +18,7 @@ from config.api import APIClient
     retry_delay_seconds=settings.API_RETRY_DELAYS,
     log_prints=True,
     cache_key_fn=task_input_hash,
-    cache_expiration=3600,
+    cache_expiration=timedelta(seconds=3600),
     tags=["extract", "api"],
 )
 def fetch_posts(api_url: str | None = None, limit: int = 10) -> list[dict[str, Any]]:

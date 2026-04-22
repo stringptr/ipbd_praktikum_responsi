@@ -15,7 +15,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:80/api/health"]
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 1s
     command:
       [
         "uv",
@@ -38,7 +38,7 @@ services:
     volumes:
       - ./prefect/postgres:/var/lib/postgresql/data:z
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U prefect"]
+      test: ["CMD", "pg_isready", "-U", "prefect"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -51,7 +51,7 @@ services:
     volumes:
       - ./prefect/dragonfly:/data:z
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -80,7 +80,7 @@ services:
       PREFECT_REDIS_MESSAGING_PORT: 6379
       PREFECT_REDIS_MESSAGING_DB: 0
     env_file: .env
-    command: prefect server start --no-services
+    command: ["prefect", "server", "start", "--no-services"]
     restart: always
     ports:
       - "${HOST_IP-127.0.0.1}:4200:4200"
@@ -92,9 +92,9 @@ services:
           "-c",
           "import urllib.request as u; u.urlopen('http://127.0.0.1:4200/api/health', timeout=1)",
         ]
-      interval: 30s
+      interval: 5s
       timeout: 10s
-      retries: 3
+      retries: 12
       start_period: 60s
 
   prefect-services:
@@ -121,7 +121,7 @@ services:
     env_file: .env
     volumes:
       - ./prefect/app:/prefect:z
-    command: prefect worker start --pool local-pool
+    command: ["prefect", "worker", "start", "--pool", "local-pool"]
     restart: on-failure
 
   postgres-warehouse:
@@ -137,7 +137,15 @@ services:
     volumes:
       - ./warehouse:/var/lib/postgresql/data:z
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_USER} -d ${WAREHOUSE_DB}"]
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "-U",
+          "${WAREHOUSE_USER}",
+          "-d",
+          "${WAREHOUSE_DB}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5

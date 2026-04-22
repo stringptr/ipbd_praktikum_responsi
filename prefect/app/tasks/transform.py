@@ -1,7 +1,7 @@
 """Transform tasks for data cleaning and enrichment."""
 
 import pandas as pd
-from typing import List, Dict, Any
+from typing import Any, TypedDict
 from datetime import datetime
 
 from prefect import task
@@ -12,7 +12,9 @@ from prefect import task
     log_prints=True,
     tags=["transform"],
 )
-def transform_posts(raw_posts: List[Dict[str, Any]]) -> pd.DataFrame:
+def transform_posts(
+    raw_posts: list[dict[str, Any]], schema: type[TypedDict]
+) -> pd.DataFrame:
     """
     Transform raw API data into a clean DataFrame.
 
@@ -30,7 +32,7 @@ def transform_posts(raw_posts: List[Dict[str, Any]]) -> pd.DataFrame:
     df = pd.DataFrame(raw_posts)
 
     # Data cleaning
-    df = _clean_dataframe(df)
+    df = _clean_dataframe(df, schema)
 
     # Data enrichment
     df = _enrich_dataframe(df)
@@ -42,23 +44,22 @@ def transform_posts(raw_posts: List[Dict[str, Any]]) -> pd.DataFrame:
     return df
 
 
-def _clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean the dataframe by handling missing values and type conversions."""
-    # Fill missing values
-    df = df.fillna(
-        {
-            "userId": 0,
-            "title": "",
-            "body": "",
-        }
-    )
+def _clean_dataframe(df: pd.DataFrame, schema: type[TypedDict]) -> pd.DataFrame:
+    """Clean dataframe according to TypedDict schema."""
+    if schema is None:
+        return df
 
-    # Ensure correct data types
-    if "userId" in df.columns:
-        df["userId"] = df["userId"].astype(int)
+    annotations = schema.__annotations__
+    defaults = schema.defaults()
 
-    if "id" in df.columns:
-        df["id"] = df["id"].astype(int)
+    for col, default_val in defaults.items():
+        if col in df.columns:
+            df[col] = df[col].fillna(default_val)
+
+    for field, field_type in annotations.items():
+        if "NotRequired" not in str(field_type):
+            if field not in df.columns:
+                raise ValueError(f"Missing required column: {field}")
 
     return df
 
@@ -90,7 +91,9 @@ def _enrich_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     log_prints=True,
     tags=["transform", "validation"],
 )
-def validate_transformed_data(df: pd.DataFrame) -> bool:
+def validate_transformed_data(
+    df: pd.DataFrame, schema: list[str], critical_cols: list[str]
+) -> bool:
     """
     Validate the transformed data before loading.
 
@@ -103,14 +106,13 @@ def validate_transformed_data(df: pd.DataFrame) -> bool:
     if df.empty:
         raise ValueError("DataFrame is empty - nothing to load")
 
-    required_columns = ["userId", "title", "body"]
+    required_columns = schema if schema else ["userId", "title", "body"]
     missing_columns = [col for col in required_columns if col not in df.columns]
 
     if missing_columns:
         raise ValueError(f"Missing required columns: {missing_columns}")
 
     # Check for nulls in critical columns
-    critical_cols = ["userId"]
     for col in critical_cols:
         null_count = df[col].isnull().sum()
         if null_count > 0:
